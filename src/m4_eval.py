@@ -115,8 +115,9 @@ def failure_analysis(eval_results: list[EvalResult], bottom_n: int = 10) -> list
     return analyzed[:bottom_n]
 
 
-def save_report(results: dict, failures: list[dict], path: str = "reports/ragas_report.json"):
-    """Save evaluation report to JSON. (Đã implement sẵn)"""
+def save_report(results: dict, failures: list[dict], path: str = "reports/ragas_report.json",
+                extra: dict | None = None):
+    """Save evaluation report to JSON. (Đã implement sẵn; thêm `extra` để ghi latency + per-question)"""
     parent_dir = os.path.dirname(path)
     if parent_dir:
         os.makedirs(parent_dir, exist_ok=True)
@@ -124,6 +125,7 @@ def save_report(results: dict, failures: list[dict], path: str = "reports/ragas_
         "aggregate": {k: v for k, v in results.items() if k != "per_question"},
         "num_questions": len(results.get("per_question", [])),
         "failures": failures,
+        **(extra or {}),
     }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)

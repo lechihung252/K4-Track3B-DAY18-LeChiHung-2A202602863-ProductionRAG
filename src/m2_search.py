@@ -14,6 +14,9 @@ from config import (QDRANT_HOST, QDRANT_PORT, COLLECTION_NAME, EMBEDDING_MODEL,
                     EMBEDDING_DIM, BM25_TOP_K, DENSE_TOP_K, HYBRID_TOP_K)
 
 
+_ENCODER_CACHE: dict = {}
+
+
 @dataclass
 class SearchResult:
     text: str
@@ -78,8 +81,12 @@ class DenseSearch:
 
     def _get_encoder(self):
         if self._encoder is None:
-            from sentence_transformers import SentenceTransformer
-            self._encoder = SentenceTransformer(EMBEDDING_MODEL)
+            # Dùng chung encoder giữa các instance (naive + production chạy cùng process trong main.py):
+            # load bge-m3 2 lần + reranker → MPS out of memory
+            if EMBEDDING_MODEL not in _ENCODER_CACHE:
+                from sentence_transformers import SentenceTransformer
+                _ENCODER_CACHE[EMBEDDING_MODEL] = SentenceTransformer(EMBEDDING_MODEL)
+            self._encoder = _ENCODER_CACHE[EMBEDDING_MODEL]
         return self._encoder
 
     def index(self, chunks: list[dict], collection: str = COLLECTION_NAME) -> None:

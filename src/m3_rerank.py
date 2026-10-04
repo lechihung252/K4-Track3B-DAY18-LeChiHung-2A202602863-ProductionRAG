@@ -10,7 +10,7 @@ if hasattr(sys.stderr, "reconfigure"):
 from dataclasses import dataclass
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import RERANK_TOP_K
+from config import RERANK_DEVICE, RERANK_TOP_K
 
 
 _MODEL_CACHE: dict = {}
@@ -36,7 +36,8 @@ class CrossEncoderReranker:
             # Cache theo model_name để các instance dùng chung, không load lại model ~2GB.
             if self.model_name not in _MODEL_CACHE:
                 from sentence_transformers import CrossEncoder
-                _MODEL_CACHE[self.model_name] = CrossEncoder(self.model_name, max_length=512)
+                _MODEL_CACHE[self.model_name] = CrossEncoder(self.model_name, max_length=512,
+                                                             device=RERANK_DEVICE)
             self._model = _MODEL_CACHE[self.model_name]
         return self._model
 

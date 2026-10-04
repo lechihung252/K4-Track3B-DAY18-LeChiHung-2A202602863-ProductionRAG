@@ -47,8 +47,24 @@ def _has_api_key() -> bool:
     return bool(OPENAI_API_KEY) and not OPENAI_API_KEY.startswith("sk-...")
 
 
-def _chat(system: str, user: str, max_tokens: int, json_mode: bool = False) -> str:
-    """Gọi gpt-4o-mini (client dùng chung giữa các thread)."""
+def _chat(system: str, user: str, max_tokens: int, json_mode: bool = False, use_cache: bool = False) -> str:
+    """Gọi gpt-4o-mini (client dùng chung giữa các thread).
+
+    use_cache=True: lưu response vào disk cache theo (system, user, max_tokens, json_mode) —
+    dùng cho các technique riêng lẻ để chạy lại tests/pipeline không phải gọi API lại.
+    """
+    key = "chat|" + hashlib.sha256(f"{LLM_MODEL}|{system}|{user}|{max_tokens}|{json_mode}".encode()).hexdigest()
+    if use_cache and key in _ENRICH_CACHE:
+        return _ENRICH_CACHE[key]
+    content = _call_llm(system, user, max_tokens, json_mode)
+    if use_cache:
+        with _cache_lock:
+            _ENRICH_CACHE[key] = content
+            _save_cache(_ENRICH_CACHE)
+    return content
+
+
+def _call_llm(system: str, user: str, max_tokens: int, json_mode: bool) -> str:
     global _CLIENT
     if _CLIENT is None:
         from openai import OpenAI
@@ -132,7 +148,7 @@ def summarize_chunk(text: str) -> str:
     if _has_api_key():
         try:
             return _chat("Tóm tắt đoạn văn sau trong 2-3 câu ngắn gọn bằng tiếng Việt. "
-                         "Giữ nguyên mọi con số, mức tiền, thời hạn.", text, max_tokens=150)
+                         "Giữ nguyên mọi con số, mức tiền, thời hạn.", text, max_tokens=150, use_cache=True)
         except Exception as e:
             print(f"  ⚠️  OpenAI summarize failed: {e}")
 
@@ -152,7 +168,7 @@ def generate_hypothesis_questions(text: str, n_questions: int = 3) -> list[str]:
     if _has_api_key():
         try:
             content = _chat(f"Dựa trên đoạn văn, tạo {n_questions} câu hỏi tiếng Việt mà đoạn văn có thể trả lời. "
-                            "Trả về mỗi câu hỏi trên 1 dòng, không đánh số.", text, max_tokens=200)
+                            "Trả về mỗi câu hỏi trên 1 dòng, không đánh số.", text, max_tokens=200, use_cache=True)
             questions = [q.strip().lstrip("0123456789.-) ").strip() for q in content.split("\n")]
             return [q for q in questions if q][:n_questions]
         except Exception as e:
@@ -175,7 +191,7 @@ def contextual_prepend(text: str, document_title: str = "") -> str:
         try:
             context = _chat("Viết 1 câu ngắn mô tả đoạn văn này nằm ở đâu trong tài liệu và nói về chủ đề gì. "
                             "Chỉ trả về 1 câu.",
-                            f"Tài liệu: {document_title}\n\nĐoạn văn:\n{text}", max_tokens=80)
+                            f"Tài liệu: {document_title}\n\nĐoạn văn:\n{text}", max_tokens=80, use_cache=True)
             return f"{context}\n\n{text}"
         except Exception as e:
             print(f"  ⚠️  OpenAI contextual failed: {e}")
@@ -197,7 +213,7 @@ def extract_metadata(text: str) -> dict:
         try:
             content = _chat('Trích xuất metadata từ đoạn văn. Trả về JSON: {"topic": "...", "entities": ["..."], '
                             '"category": "policy|hr|it|finance", "language": "vi|en"}',
-                            text, max_tokens=150, json_mode=True)
+                            text, max_tokens=150, json_mode=True, use_cache=True)
             return {**default, **json.loads(content)}
         except Exception as e:
             print(f"  ⚠️  OpenAI metadata failed: {e}")
