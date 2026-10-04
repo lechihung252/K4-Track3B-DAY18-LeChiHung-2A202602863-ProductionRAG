@@ -15,6 +15,7 @@ from config import TEST_SET_PATH
 METRICS = ["faithfulness", "answer_relevancy", "context_precision", "context_recall"]
 RAGAS_LLM_MODEL = "gpt-4o-mini"
 RAGAS_EMBEDDING_MODEL = "text-embedding-3-small"
+SAME_LANGUAGE_INSTRUCTION = " The generated question MUST be written in the same language as the answer."
 
 
 @dataclass
@@ -53,6 +54,13 @@ def evaluate_ragas(questions: list[str], answers: list[str],
         from ragas import evaluate
         from ragas.metrics import answer_relevancy, context_precision, context_recall, faithfulness
         from ragas.run_config import RunConfig
+
+        # Prompt sinh câu hỏi của answer_relevancy là tiếng Anh → sinh câu hỏi tiếng Anh cho câu trả lời
+        # tiếng Việt → cosine cross-lingual thấp (~0.48 vs ~0.85 cùng ngôn ngữ) dù câu trả lời đúng.
+        # Ép sinh câu hỏi cùng ngôn ngữ với câu trả lời (áp dụng cho cả baseline lẫn production).
+        qgen = answer_relevancy.question_generation
+        if SAME_LANGUAGE_INSTRUCTION not in qgen.instruction:
+            qgen.instruction += SAME_LANGUAGE_INSTRUCTION
 
         dataset = Dataset.from_dict({
             "question": questions, "answer": answers,
