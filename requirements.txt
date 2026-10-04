@@ -3,7 +3,9 @@ python-dotenv>=1.0
 underthesea>=6.8
 rank-bm25>=0.2.2
 qdrant-client>=1.9
-sentence-transformers>=3.0
+sentence-transformers>=3.0,<4
+transformers>=4.41,<4.50
+numpy<2
 flashrank>=0.2
 ragas>=0.1.10,<0.2
 langchain-community>=0.2,<0.3
