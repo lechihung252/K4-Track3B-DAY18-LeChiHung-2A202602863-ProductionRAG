@@ -183,7 +183,9 @@ def chunk_hierarchical(text: str, parent_size: int = HIERARCHICAL_PARENT_SIZE,
         pid = f"{prefix}parent_{len(parents)}"
         parents.append(Chunk(text=parent_text,
                              metadata={**metadata, "chunk_type": "parent", "parent_id": pid}))
-        for child_text in _split_to_size(parent_text, child_size):
+        # Tách theo header trước để child không vắt qua 2 section
+        sections = [s for s in re.split(r'(?m)^(?=#{1,3}\s)', parent_text) if s.strip()]
+        for child_text in (t for sec in sections for t in _split_to_size(sec, child_size)):
             children.append(Chunk(text=child_text,
                                   metadata={**metadata, "chunk_type": "child", "chunk_index": len(children)},
                                   parent_id=pid))
